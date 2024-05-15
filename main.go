@@ -28,16 +28,17 @@ type Config struct {
 
 func main() {
 	config := Config{
+		Dir:   ".",
 		Port:  8080,
 		Host:  "localhost",
 		Index: "index.html",
 	}
 	proxy := []string{}
 	flag.IntVarP(&config.Port, "port", "p", config.Port, "Listen port")
-	flag.StringVarP(&config.Host, "host", "h", config.Host, "Listen interface")
+	flag.StringVarP(&config.Host, "host", "h", config.Host, "Bind to network interface")
 	flag.StringArrayVarP(&proxy, "proxy", "r", proxy, "Reverse Proxy: '/thing http://localhost:8085/thing' (one or more)")
 	flag.BoolVarP(&config.Verbose, "verbose", "v", config.Verbose, "Colour prints ingoing/outgoing requests for debugging")
-	flag.StringVarP(&config.Dir, "dir", "d", config.Dir, "Directory to serve")
+	flag.StringVarP(&config.Dir, "dir", "d", config.Dir, "Directory of static files to serve")
 	flag.StringVarP(&config.Index, "index", "I", config.Index, "Index file to serve for directores")
 	flag.StringVarP(&config.AppIndex, "app-index", "A", config.AppIndex, "Index file to serve in place of 404 (for SPA)")
 	flag.Parse()
