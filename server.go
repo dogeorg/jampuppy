@@ -131,17 +131,12 @@ func (jp *jamPuppyHandler) serveFileModified(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	f, err := jp.root.Open(name)
+	var f http.File
+	var err error
+	f, err = jp.root.Open(name)
 	if err != nil {
-		if jp.appindex != "" {
-			// AppIndex: serve up the index page instead.
-			f, err = jp.root.Open(jp.appindex)
-			if err != nil {
-				msg, code := toHTTPError(err)
-				http.Error(w, msg, code)
-				return
-			}
-		} else {
+		if f = jp.choose404file(name); f == nil {
+			// report the original error above
 			msg, code := toHTTPError(err)
 			http.Error(w, msg, code)
 			return
@@ -195,6 +190,26 @@ func (jp *jamPuppyHandler) serveFileModified(w http.ResponseWriter, r *http.Requ
 	// ServeContent checks if-* conditions, detects content-type,
 	// sets content-length and serves up the response.
 	http.ServeContent(w, r, d.Name(), d.ModTime(), f)
+}
+
+func (jp *jamPuppyHandler) choose404file(name string) http.File {
+	// check if no dot after the last slash
+	// note: name always starts with '/' so -1 < 0 if no '.' is found
+	if strings.LastIndexByte(name, 46 /* dot */) < strings.LastIndexByte(name, 47 /* slash */) {
+		// html masking: try the name with '.html' on the end
+		f, err := jp.root.Open(name + ".html")
+		if err == nil {
+			return f
+		}
+	}
+	if jp.appindex != "" {
+		// AppIndex: serve up the index page instead.
+		f, err := jp.root.Open(jp.appindex)
+		if err == nil {
+			return f
+		}
+	}
+	return nil
 }
 
 // The following are copied unmodified from net/http/fs.go
