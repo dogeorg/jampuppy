@@ -1,4 +1,4 @@
-module github.com/dogeorg/jampuppy
+module code.dogeocin.org/jampuppy
 
 go 1.18
 
