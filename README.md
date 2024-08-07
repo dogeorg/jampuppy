@@ -1,5 +1,7 @@
 # JamPuppy - a Jam Stack tool for Dogebox 
 
+This project is hosted on [radicle.xyz](https://radicle.xyz) at [rad:zFn9j7QAVA1juvUkjNxKDHRREn35](https://app.radicle.xyz/nodes/ash.radicle.garden/zFn9j7QAVA1juvUkjNxKDHRREn35)
+
 JamPuppy is a simple go binary that can be used to create and
 serve static jam-stack apps on dogebox, as installable pups.
 
