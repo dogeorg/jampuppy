@@ -10,8 +10,8 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}",
-            "args": ["-d","web"]
+            "cwd": "../dogemap-ui",
+            "args": ["-A","index.html","-p","8000","--proxy","/dmx/dogenet http://localhost:8085/"]
         }
-
     ]
 }

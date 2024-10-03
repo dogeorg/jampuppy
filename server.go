@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"io/fs"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -19,11 +20,6 @@ const (
 	Tag404
 )
 
-// type cacheEntry struct {
-// 	tag CacheTag
-// 	to  string
-// }
-
 // Inspired by the code in net/http/fs.go:
 // ServeHTTP:929 calls serveFile
 // ServeFile:755 calls serveFile
@@ -39,9 +35,6 @@ type jamPuppyHandler struct {
 	verbose  bool
 }
 
-//reverseProxy httputil.ReverseProxy
-// knownFiles map[string]cacheEntry
-
 // Proxy from /{Path}/* to `{To}/*`
 type Proxy struct {
 	Path string   // MUST start with '/' (doesn't need to end with '/')
@@ -49,37 +42,14 @@ type Proxy struct {
 }
 
 func JamPuppyServer(config Config) http.Handler {
-	// prefixes := []string{}
-	// for _, p := range proxy {
-	// 	prefixes = append(prefixes, p.Path)
-	// }
-	// var jp *jamPuppyHandler
 	return &jamPuppyHandler{
 		root:     http.Dir(config.Dir),
 		index:    config.Index,
 		appindex: config.AppIndex,
 		proxy:    config.Proxy,
-		// reverseProxy: httputil.ReverseProxy{Director: func(r *http.Request) {
-		// 	jp.rewriteProxyURL(r)
-		// }},
-		verbose: config.Verbose,
-		// knownFiles: map[string]cacheEntry{},
+		verbose:  config.Verbose,
 	}
 }
-
-// func (jp *jamPuppyHandler) rewriteProxyURL(r *http.Request) {
-// 	// based on rewriteRequestURL:269 in net/http/httputil/reverseproxy.go
-// 	target, _ := url.Parse("http://locahost/foo")
-// 	targetQuery := target.RawQuery
-// 	r.URL.Scheme = target.Scheme
-// 	r.URL.Host = target.Host
-// 	r.URL.Path, r.URL.RawPath = joinURLPath(target, r.URL)
-// 	if targetQuery == "" || r.URL.RawQuery == "" {
-// 		r.URL.RawQuery = targetQuery + r.URL.RawQuery
-// 	} else {
-// 		r.URL.RawQuery = targetQuery + "&" + r.URL.RawQuery
-// 	}
-// }
 
 func (jp *jamPuppyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// support .html masking
@@ -98,26 +68,28 @@ func (jp *jamPuppyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[%v] %v\n", r.Method, upath)
+
+	// for development, avoid browser-side caching.
+	w.Header().Add("Cache-Control", "private; max-age=0")
+
 	for _, p := range jp.proxy {
 		if strings.HasPrefix(upath, p.Path) {
+			// strip off the matching prefix to allow remapping.
+			// to preserve the prefix, append it to the `To` URL.
+			subpath := upath[len(p.Path):]
+			if !strings.HasPrefix(subpath, "/") {
+				subpath = "/" + subpath
+			}
+			r.URL.Path = subpath
+			result, raw := joinURLPath(p.To, r.URL)
+			log.Printf("proxy rewrite: %v -> %v [%v]", upath, result, raw)
 			// cretae a reverse-proxy to serve the request
 			proxy := httputil.NewSingleHostReverseProxy(p.To)
 			proxy.ServeHTTP(w, r)
 			return
 		}
 	}
-
-	// check if we have a cached classification
-	// if entry, found := f.knownFiles[upath]; found {
-	// 	switch entry.tag {
-	// 	case TagFile:
-	// 		r.URL.Path = entry.to
-	// 		// this API supplies its own seek-based size function,
-	// 		// even though we have Stat().Size() available sad face.
-	// 		// http.ServeContent(w, r, upath, modtime, content)
-	// 	}
-	// 	return
-	// }
 
 	jp.serveFileModified(w, r, upath)
 }
@@ -248,38 +220,21 @@ func containsDotDot(v string) bool {
 
 func isSlashRune(r rune) bool { return r == '/' || r == '\\' }
 
-// as usual, these are private helpers we needed to copy to implement
-// a proxy like NewSingleHostReverseProxy with customization.
+// private helper from reverseproxy.go so we can log the
+// proxy destination path (useful for debugging)
 
-// func joinURLPath(a, b *url.URL) (path, rawpath string) {
-// 	if a.RawPath == "" && b.RawPath == "" {
-// 		return singleJoiningSlash(a.Path, b.Path), ""
-// 	}
-// 	// Same as singleJoiningSlash, but uses EscapedPath to determine
-// 	// whether a slash should be added
-// 	apath := a.EscapedPath()
-// 	bpath := b.EscapedPath()
-
-// 	aslash := strings.HasSuffix(apath, "/")
-// 	bslash := strings.HasPrefix(bpath, "/")
-
-// 	switch {
-// 	case aslash && bslash:
-// 		return a.Path + b.Path[1:], apath + bpath[1:]
-// 	case !aslash && !bslash:
-// 		return a.Path + "/" + b.Path, apath + "/" + bpath
-// 	}
-// 	return a.Path + b.Path, apath + bpath
-// }
-
-// func singleJoiningSlash(a, b string) string {
-// 	aslash := strings.HasSuffix(a, "/")
-// 	bslash := strings.HasPrefix(b, "/")
-// 	switch {
-// 	case aslash && bslash:
-// 		return a + b[1:]
-// 	case !aslash && !bslash:
-// 		return a + "/" + b
-// 	}
-// 	return a + b
-// }
+func joinURLPath(a, b *url.URL) (path, rawpath string) {
+	// Same as singleJoiningSlash, but uses EscapedPath to determine
+	// whether a slash should be added
+	apath := a.EscapedPath()
+	bpath := b.EscapedPath()
+	aslash := strings.HasSuffix(apath, "/")
+	bslash := strings.HasPrefix(bpath, "/")
+	switch {
+	case aslash && bslash:
+		return a.Path + b.Path[1:], apath + bpath[1:]
+	case !aslash && !bslash:
+		return a.Path + "/" + b.Path, apath + "/" + bpath
+	}
+	return a.Path + b.Path, apath + bpath
+}

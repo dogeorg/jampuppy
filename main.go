@@ -78,10 +78,10 @@ func parseProxy(proxy []string) (res []Proxy) {
 			if !strings.HasPrefix(path, "/") {
 				path = "/" + path
 			}
-			if path == "/" {
-				log.Printf("invalid path in --proxy flag: '%v' (a path is required e.g. /foo)\n", path)
-				os.Exit(1)
-			}
+			// if path == "/" {
+			// 	log.Printf("invalid path in --proxy flag: '%v' (a path is required e.g. /foo)\n", path)
+			// 	os.Exit(1)
+			// }
 			to_url := parts[i+1]
 			if to_url == "" { // edge-case
 				log.Printf("invalid URL in --proxy flag: proxy-to url is missing\n")
@@ -92,7 +92,7 @@ func parseProxy(proxy []string) (res []Proxy) {
 				log.Printf("invalid URL in --proxy flag: '%v' (%v)\n", to_url, err)
 				os.Exit(1)
 			}
-			if u.Scheme == "" || u.Host == "" || u.Path == "" || u.Path == "/" {
+			if u.Scheme == "" || u.Host == "" || u.Path == "" { // || u.Path == "/"
 				log.Printf("invalid URL in --proxy flag: '%v' (scheme, host and path are required e.g. http://localhost/foo)\n", to_url)
 				os.Exit(1)
 			}
